@@ -1,0 +1,29 @@
+[
+	{
+		"id": "preferences",
+		"children":
+		[
+			{
+				"caption": "Package Settings",
+                "id": "package-settings",
+                "mnemonic": "P",
+                "children":
+                [
+                	{
+                        "caption": "ClangFormatSublimePlugin",
+                        "children":
+                        [
+                            {
+                                "caption": "Settings - User",
+                                "command": "open_file", "args":
+                                {
+                                    "file": "${packages}/User/clang_format.sublime-settings"
+                                }
+                            }
+                        ]
+                	}
+                ]
+			}
+		]
+	}
+]
