@@ -1,13 +1,13 @@
 import sublime
 import sublime_plugin
 import os
-import distutils.spawn
 import shutil
 import subprocess
+import xml.etree.ElementTree as ET
 
 # conversion from sublime encoding to python encoding
 # code taken from https://github.com/rosshemsley/SublimeClangFormat/
-st_encodings_trans = {
+subl_to_python_encoding = {
    "UTF-8" : "utf-8",
    "UTF-8 with BOM" : "utf-8-sig",
    "UTF-16 LE" : "utf-16-le",
@@ -52,57 +52,78 @@ def binary_exists(binary):
 		return False
 	return True
 
-def file_language_is_supported(supported_languages, filename_language):
+def file_language_supported(supported_languages):
+	view = sublime.active_window().active_view()
+	filename_language_syntax_path = view.settings().get('syntax')
+	filename_language, extension = os.path.splitext(os.path.basename(filename_language_syntax_path))
 	if len(supported_languages):
 		for language in supported_languages:
 			if language == filename_language:
 				return True
 	return False
 
+def get_python_encoding():
+	view = sublime.active_window().active_view()
+	subl_encoding = view.encoding()
+	py_encoding = subl_to_python_encoding[subl_encoding]
+	if py_encoding == None:
+		py_encoding = 'utf-8'
+	return py_encoding
+
+def execute_command(command):
+	view = sublime.active_window().active_view()
+
+	py_encoding = get_python_encoding()
+	buffer = view.substr(sublime.Region(0, view.size()))
+	buffer_encoded = buffer.encode(py_encoding)
+
+	proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+	output, error = proc.communicate(buffer_encoded)
+	if error:
+		sublime.error_message("clang-format failed. Check if clang-format exists in your system")
+
+	output = output.decode(py_encoding)
+	return output
+
+def formating_needed(binary, filename_path):
+	command = [binary, '--output-replacements-xml', filename_path]
+	command_xml_output = execute_command(command)
+
+	formating_needed = parse_xml(command_xml_output)
+	return formating_needed
+
+def parse_xml(buffer):
+	tree = ET.ElementTree(ET.fromstring(buffer))
+	root = tree.getroot()
+	if len(list(root)) > 0:
+		return True
+	return False
+
 # Triggered when clang_format command is executed
 class ClangFormatCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		settings_global = sublime.load_settings('clang_format.sublime-settings')
+		user_settings = sublime.load_settings('clang_format_user.sublime-settings')
+		binary = user_settings.get('binary', 'clang-format')
+		supported_languages = user_settings.get('supported_languages', [])
 
-		supported_languages = settings_global.get('languages', [])
-		filename_language_syntax_path = self.view.settings().get('syntax')
-		filename_language, extension = os.path.splitext(os.path.basename(filename_language_syntax_path))
-		if not file_language_is_supported(supported_languages, filename_language):
+		if not file_language_supported(supported_languages):
 			return
 
-		binary = settings_global.get('binary', 'clang-format')
 		if not binary_exists(binary):
 			return
 
-		file_encoding_subl = self.view.encoding()
-		file_encoding_py = st_encodings_trans[file_encoding_subl]
-		if file_encoding_py == None:
-			file_encoding_py = 'utf-8'
-
-		buffer = self.view.substr(sublime.Region(0, self.view.size()))
-		buffer_encoded = buffer.encode(file_encoding_py)
-
-		# check if anything to format, if not then return
-
 		filename_path = self.view.file_name()
-		command = [binary, '-style', 'file', filename_path]
-
-		proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-		print(subprocess.list2cmdline(command))
-		output, error = proc.communicate(buffer_encoded)
-		if error:
-			sublime.error_message("clang-format failed. Check if clang-format exists in your system")
+		if not formating_needed(binary, filename_path):
 			return
 
-		buffer_decoded = output.decode(file_encoding_py)
-		self.view.replace(edit, sublime.Region(0, self.view.size()), buffer_decoded)
+		command = [binary, '-style', 'file', filename_path]
+		command_output = execute_command(command)
+
+		self.view.replace(edit, sublime.Region(0, self.view.size()), command_output)
 
 class autoClangOnSave(sublime_plugin.EventListener):
 	def on_pre_save_async(self, view):
-		syntax_path = view.settings().get("syntax")
-		filename, _extension = os.path.splitext(os.path.basename(syntax_path))
-		settings_global = sublime.load_settings('clang_format.sublime-settings')
-		supported_languages = settings_global.get('languages', [])
-		if not file_language_is_supported(supported_languages, filename):
-			return
-		view.run_command("clang_format")
+		user_settings = sublime.load_settings('clang_format_user.sublime-settings')
+		format_on_save = user_settings.get('format_on_save', 'false')
+		if format_on_save:
+			view.run_command("clang_format")

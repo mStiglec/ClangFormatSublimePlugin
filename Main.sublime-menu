@@ -17,7 +17,7 @@
                                 "caption": "Settings - User",
                                 "command": "open_file", "args":
                                 {
-                                    "file": "${packages}/User/clang_format.sublime-settings"
+                                    "file": "${packages}/User/clang_format_user.sublime-settings"
                                 }
                             }
                         ]
