@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import xml.etree.ElementTree as ET
+import re
 
 # conversion from sublime encoding to python encoding
 # code taken from https://github.com/rosshemsley/SublimeClangFormat/
@@ -80,13 +81,21 @@ def execute_command(command):
 	proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
 	output, error = proc.communicate(buffer_encoded)
 	if error:
-		sublime.error_message("clang-format failed. Check if clang-format exists in your system")
+		# TODO: make this error message generic (print which command is not avaialble)
+		sublime.error_message("command failed." + str(command) + " Check if command exists in your system")
 
 	output = output.decode(py_encoding)
 	return output
 
-def formating_needed(binary, filename_path):
-	command = [binary, '--output-replacements-xml', filename_path]
+def formating_needed(binary, config_file_path, filename):
+	command = [binary, '--output-replacements-xml', filename]
+	if config_file_path == None:
+		command.append('-style')
+		command.append('file')
+	else:
+		command.append('-style')
+		command.append('file:' + config_file_path)
+
 	command_xml_output = execute_command(command)
 
 	formating_needed = parse_xml(command_xml_output)
@@ -99,12 +108,21 @@ def parse_xml(buffer):
 		return True
 	return False
 
-# Triggered when clang_format command is executed
+def clang_version_13_or_lower(binary):
+	command = [binary, '--version']
+	command_output = execute_command(command)
+	clang_version_14_or_newer = re.search(r'[1-9][456789]+\.[0-9]+\.[0-9]+', command_output)
+	if not clang_version_14_or_newer:
+		return True
+	return False
+
+# Triggered when ST clang_format command is executed
 class ClangFormatCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		user_settings = sublime.load_settings('clang_format_user.sublime-settings')
 		binary = user_settings.get('binary', 'clang-format')
 		supported_languages = user_settings.get('supported_languages', [])
+		config_file_path = user_settings.get('config_file_path', None)
 
 		if not file_language_supported(supported_languages):
 			return
@@ -112,11 +130,18 @@ class ClangFormatCommand(sublime_plugin.TextCommand):
 		if not binary_exists(binary):
 			return
 
-		filename_path = self.view.file_name()
-		if not formating_needed(binary, filename_path):
+		filename = self.view.file_name()
+		if not formating_needed(binary, config_file_path, filename):
 			return
 
-		command = [binary, '-style', 'file', filename_path]
+		command = [binary, '-style']
+		if config_file_path == None or clang_version_13_or_lower(binary):
+			command.append('file')
+			command.append(filename)
+		else:
+			command.append('file:' + config_file_path)
+			command.append(filename)
+
 		command_output = execute_command(command)
 
 		self.view.replace(edit, sublime.Region(0, self.view.size()), command_output)
