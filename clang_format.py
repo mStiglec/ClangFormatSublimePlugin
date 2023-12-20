@@ -91,7 +91,7 @@ def execute_command(command):
 
 def formating_needed(binary, config_file_path, filename):
 	command = [binary, '--output-replacements-xml', filename]
-	if config_file_path == None:
+	if config_file_path == None or clang_version_13_or_lower(binary):
 		command.append('-style')
 		command.append('file')
 	else:
@@ -117,17 +117,6 @@ def clang_version_13_or_lower(binary):
 	if not clang_version_14_or_newer:
 		return True
 	return False
-
-def run_clang_format(view):
-	global file_saved_on_disk
-	if not file_saved_on_disk:
-		file_saved_on_disk = True
-		view.run_command('save')
-	user_settings = sublime.load_settings('clang_format.sublime-settings')
-	format_on_save = user_settings.get('format_on_save', 'false')
-	if format_on_save:
-		file_saved_on_disk = False
-		view.run_command("clang_format")
 
 # Triggered when ST clang_format command is executed
 class ClangFormatCommand(sublime_plugin.TextCommand):
@@ -161,4 +150,12 @@ class ClangFormatCommand(sublime_plugin.TextCommand):
 
 class ClangFormatEventListener(sublime_plugin.EventListener):
 	def on_pre_save(self, view):
-		run_clang_format(view)
+		global file_saved_on_disk
+		if not file_saved_on_disk:
+			file_saved_on_disk = True
+			view.run_command('save')
+		user_settings = sublime.load_settings('clang_format.sublime-settings')
+		format_on_save = user_settings.get('format_on_save', 'false')
+		if format_on_save:
+			file_saved_on_disk = False
+			view.run_command("clang_format")
