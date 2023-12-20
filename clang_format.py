@@ -6,6 +6,8 @@ import subprocess
 import xml.etree.ElementTree as ET
 import re
 
+file_saved_on_disk = False
+
 # conversion from sublime encoding to python encoding
 # code taken from https://github.com/rosshemsley/SublimeClangFormat/
 subl_to_python_encoding = {
@@ -81,8 +83,8 @@ def execute_command(command):
 	proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
 	output, error = proc.communicate(buffer_encoded)
 	if error:
-		# TODO: make this error message generic (print which command is not avaialble)
-		sublime.error_message("command failed." + str(command) + " Check if command exists in your system")
+		command_str = ' '.join(str(element) for element in command)
+		sublime.error_message("COMMAND FAILED: " + command_str)
 
 	output = output.decode(py_encoding)
 	return output
@@ -116,13 +118,25 @@ def clang_version_13_or_lower(binary):
 		return True
 	return False
 
+def run_clang_format(view):
+	global file_saved_on_disk
+	if not file_saved_on_disk:
+		file_saved_on_disk = True
+		view.run_command('save')
+	user_settings = sublime.load_settings('clang_format.sublime-settings')
+	format_on_save = user_settings.get('format_on_save', 'false')
+	if format_on_save:
+		file_saved_on_disk = False
+		view.run_command("clang_format")
+
 # Triggered when ST clang_format command is executed
 class ClangFormatCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		user_settings = sublime.load_settings('clang_format_user.sublime-settings')
+		user_settings = sublime.load_settings('clang_format.sublime-settings')
 		binary = user_settings.get('binary', 'clang-format')
 		supported_languages = user_settings.get('supported_languages', [])
 		config_file_path = user_settings.get('config_file_path', None)
+		filename = self.view.file_name()
 
 		if not file_language_supported(supported_languages):
 			return
@@ -130,7 +144,6 @@ class ClangFormatCommand(sublime_plugin.TextCommand):
 		if not binary_exists(binary):
 			return
 
-		filename = self.view.file_name()
 		if not formating_needed(binary, config_file_path, filename):
 			return
 
@@ -146,9 +159,9 @@ class ClangFormatCommand(sublime_plugin.TextCommand):
 
 		self.view.replace(edit, sublime.Region(0, self.view.size()), command_output)
 
-class autoClangOnSave(sublime_plugin.EventListener):
-	def on_pre_save_async(self, view):
-		user_settings = sublime.load_settings('clang_format_user.sublime-settings')
-		format_on_save = user_settings.get('format_on_save', 'false')
-		if format_on_save:
-			view.run_command("clang_format")
+#class ClangFormatEventListener(sublime_plugin.EventListener):
+#	def on_pre_save(self, view):
+#		run_clang_format(view)
+
+#	def on_deactivated(self, view):
+#		run_clang_format(view)

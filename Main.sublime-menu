@@ -14,12 +14,19 @@
                         "children":
                         [
                             {
+                                "caption": "Settings - Default",
+                                "command": "open_file", "args":
+                                {
+                                    "file": "${packages}/ClangFormatSublimePlugin/clang_format.sublime-settings"
+                                }
+                            },
+                            {
                                 "caption": "Settings - User",
                                 "command": "open_file", "args":
                                 {
-                                    "file": "${packages}/User/clang_format_user.sublime-settings"
+                                    "file": "${packages}/User/clang_format.sublime-settings"
                                 }
-                            }
+                            },
                         ]
                 	}
                 ]
