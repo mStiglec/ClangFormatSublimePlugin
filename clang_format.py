@@ -9,7 +9,7 @@ import re
 file_saved_on_disk = False
 
 # conversion from sublime encoding to python encoding
-# code taken from https://github.com/rosshemsley/SublimeClangFormat/
+# taken from https://github.com/rosshemsley/SublimeClangFormat/
 subl_to_python_encoding = {
    "UTF-8" : "utf-8",
    "UTF-8 with BOM" : "utf-8-sig",
@@ -159,9 +159,6 @@ class ClangFormatCommand(sublime_plugin.TextCommand):
 
 		self.view.replace(edit, sublime.Region(0, self.view.size()), command_output)
 
-#class ClangFormatEventListener(sublime_plugin.EventListener):
-#	def on_pre_save(self, view):
-#		run_clang_format(view)
-
-#	def on_deactivated(self, view):
-#		run_clang_format(view)
+class ClangFormatEventListener(sublime_plugin.EventListener):
+	def on_pre_save(self, view):
+		run_clang_format(view)
