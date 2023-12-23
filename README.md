@@ -3,13 +3,13 @@
 Option *-style=file* is used for formatting. With this option user can define and use his own configuration file.
 
 ## Install
-There are two ways to install plugin:
-  1. Place this repository inside:
+1. Go to sublime packages folder:
       - *<path_to_sublime_text>/Packages/*.
-  2. Using [Package Control](https://packagecontrol.io/installation). Plugin will be stored inside:
-      - *<path_to_sublime_text>/Installed Packages/*
 
-First option is recommended.
+2. Download repository or execute clone command:
+     - *git clone [https://github.com/mStiglec/ClangFormatSublimePlugin](https://github.com/mStiglec/ClangFormatSublimePlugin.git)*
+
+After plugin is inside Packages folder it is ready to use.
 
 ## Prerequisites
 Clang-format must be installed:
