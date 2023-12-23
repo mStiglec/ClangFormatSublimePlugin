@@ -1,13 +1,12 @@
 {
 	// path to clang-format binary
-	// you can find path to clang-format library with "which clang-format"
-	// command in linux
+	// Linux example: /usr/bin/clang-format
+	// Windows example: C:/Program Files/LLVM/bin/clang-format.exe
 	"binary" : "/usr/bin/clang-format",
 
 	// This option ca be used only with clang-format version 14 and upper
 	// If clang-format version is lower than 14 clang-format config file
-	// must be placed in project firectory or in any parent folder
-	// E.g. "config_file_path" : "/home/$USER/MyProjects/.clang-format"
+	// must be placed in project directory or in any parent folder
 	//"config_file_path" : "",
 
 	// Run clang-format on file save

@@ -6,8 +6,6 @@ import subprocess
 import xml.etree.ElementTree as ET
 import re
 
-file_saved_on_disk = False
-
 # conversion from sublime encoding to python encoding
 # taken from https://github.com/rosshemsley/SublimeClangFormat/
 subl_to_python_encoding = {
@@ -51,7 +49,9 @@ subl_to_python_encoding = {
 
 def binary_exists(binary):
 	if shutil.which(binary) == None:
-		sublime.error_message("Clang binary is not found. Check if you have clang-format installed")
+		sublime.error_message("Clang binary is not found.\n"
+									 "Check if clang-format is installed on your system.\n"
+									 "Check if binary option in plugin settings has correct path to clang-format executable.\n")
 		return False
 	return True
 
@@ -73,9 +73,7 @@ def get_python_encoding():
 		py_encoding = 'utf-8'
 	return py_encoding
 
-def execute_command(command):
-	view = sublime.active_window().active_view()
-
+def execute_command(command, view):
 	py_encoding = get_python_encoding()
 	buffer = view.substr(sublime.Region(0, view.size()))
 	buffer_encoded = buffer.encode(py_encoding)
@@ -84,35 +82,15 @@ def execute_command(command):
 	output, error = proc.communicate(buffer_encoded)
 	if error:
 		command_str = ' '.join(str(element) for element in command)
-		sublime.error_message("COMMAND FAILED: " + command_str)
+		sublime.error_message("FAILURE\nREASON: " + str(error))
+		return "failure"
 
 	output = output.decode(py_encoding)
 	return output
 
-def formating_needed(binary, config_file_path, filename):
-	command = [binary, '--output-replacements-xml', filename]
-	if config_file_path == None or clang_version_13_or_lower(binary):
-		command.append('-style')
-		command.append('file')
-	else:
-		command.append('-style')
-		command.append('file:' + config_file_path)
-
-	command_xml_output = execute_command(command)
-
-	formating_needed = parse_xml(command_xml_output)
-	return formating_needed
-
-def parse_xml(buffer):
-	tree = ET.ElementTree(ET.fromstring(buffer))
-	root = tree.getroot()
-	if len(list(root)) > 0:
-		return True
-	return False
-
-def clang_version_13_or_lower(binary):
+def clang_version_13_or_lower(binary, view):
 	command = [binary, '--version']
-	command_output = execute_command(command)
+	command_output = execute_command(command, view)
 	clang_version_14_or_newer = re.search(r'[1-9][456789]+\.[0-9]+\.[0-9]+', command_output)
 	if not clang_version_14_or_newer:
 		return True
@@ -122,40 +100,36 @@ def clang_version_13_or_lower(binary):
 class ClangFormatCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		user_settings = sublime.load_settings('clang_format.sublime-settings')
-		binary = user_settings.get('binary', 'clang-format')
+		default_binary = 'clang-format.exe' if os.name == 'nt' else 'clang-format'
+		binary = user_settings.get('binary', default_binary)
 		supported_languages = user_settings.get('supported_languages', [])
 		config_file_path = user_settings.get('config_file_path', None)
 		filename = self.view.file_name()
 
 		if not file_language_supported(supported_languages):
+			print("language is not supported, check your langagues option in settings")
 			return
 
 		if not binary_exists(binary):
 			return
 
-		if not formating_needed(binary, config_file_path, filename):
-			return
-
 		command = [binary, '-style']
-		if config_file_path == None or clang_version_13_or_lower(binary):
+		if config_file_path == None or clang_version_13_or_lower(binary, self.view):
 			command.append('file')
+			command.append('--assume-filename')
 			command.append(filename)
 		else:
 			command.append('file:' + config_file_path)
+			command.append('--assume-filename')
 			command.append(filename)
 
-		command_output = execute_command(command)
-
-		self.view.replace(edit, sublime.Region(0, self.view.size()), command_output)
+		command_output = execute_command(command, self.view)
+		if command_output != "failure":
+			self.view.replace(edit, sublime.Region(0, self.view.size()), command_output)
 
 class ClangFormatEventListener(sublime_plugin.EventListener):
 	def on_pre_save(self, view):
-		global file_saved_on_disk
-		if not file_saved_on_disk:
-			file_saved_on_disk = True
-			view.run_command('save')
 		user_settings = sublime.load_settings('clang_format.sublime-settings')
 		format_on_save = user_settings.get('format_on_save', 'false')
 		if format_on_save:
-			file_saved_on_disk = False
 			view.run_command("clang_format")
